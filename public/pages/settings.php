@@ -234,9 +234,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
                 $tables = $pdo->query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")->fetchAll(PDO::FETCH_COLUMN);
                 foreach ($tables as $table) {
-                    $seq = $pdo->query("SELECT pg_get_serial_sequence('\"$table\"', 'id')")->fetchColumn();
-                    if ($seq) {
-                        $pdo->query("SELECT setval('$seq', COALESCE((SELECT MAX(id) FROM \"$table\"), 1), true)");
+                    // 1. Verifica se a tabela realmente tem uma coluna chamada 'id'
+                    $has_id = $pdo->query("SELECT 1 FROM information_schema.columns WHERE table_name = '$table' AND column_name = 'id'")->fetchColumn();
+                    
+                    if ($has_id) {
+                        // 2. Só então tenta buscar a sequência e corrigir
+                        try {
+                            $seq = $pdo->query("SELECT pg_get_serial_sequence('$table', 'id')")->fetchColumn();
+                            if ($seq) {
+                                $pdo->query("SELECT setval('$seq', COALESCE((SELECT MAX(id) FROM \"$table\"), 1))");
+                            }
+                        } catch (Exception $e) {
+                            // Ignora silenciosamente tabelas que não usam serial/auto_increment
+                            continue;
+                        }
                     }
                 }
                 $message = "Sequências (IDs) sincronizadas com sucesso!";

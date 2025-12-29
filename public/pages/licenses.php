@@ -35,14 +35,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($action == 'create_license') {
                 $stmt = $pdo->prepare("INSERT INTO licenses (company_id, supplier_id, software_name, license_key, purchase_date, expiration_date, total_seats, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$company_id, $supplier_id, $software_name, $license_key, $purchase_date, $expiration_date, $total_seats, $notes]);
-                log_action('license_create', "Licença '{$software_name}' registrada. ID: " . $pdo->lastInsertId());
-                $message = "Licença registrada com sucesso!";
+                log_action('license_create', "Licença '{$software_name}' registrada. ID: " . $pdo->lastInsertId()); 
+                $_SESSION['message'] = "Licença registrada com sucesso!";
             } else {
                 $id = $_POST['id'];
                 $stmt = $pdo->prepare("UPDATE licenses SET supplier_id=?, software_name=?, license_key=?, purchase_date=?, expiration_date=?, total_seats=?, notes=? WHERE id=? AND company_id=?");
                 $stmt->execute([$supplier_id, $software_name, $license_key, $purchase_date, $expiration_date, $total_seats, $notes, $id, $company_id]);
-                log_action('license_update', "Licença '{$software_name}' (ID: {$id}) atualizada.");
-                $message = "Licença atualizada com sucesso!";
+                log_action('license_update', "Licença '{$software_name}' (ID: {$id}) atualizada."); 
+                $_SESSION['message'] = "Licença atualizada com sucesso!";
             }
         }
 
@@ -50,8 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $id = $_POST['id'];
             $stmt = $pdo->prepare("DELETE FROM licenses WHERE id = ? AND company_id = ?");
             $stmt->execute([$id, $company_id]);
-            log_action('license_delete', "Licença ID {$id} removida.");
-            $message = "Licença removida.";
+            log_action('license_delete', "Licença ID {$id} removida."); 
+            $_SESSION['message'] = "Licença removida.";
         }
 
         // --- ATRIBUIR LICENÇA A ATIVO ---
@@ -67,8 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($license_info && $license_info['used_seats'] < $license_info['total_seats']) {
                 $stmt = $pdo->prepare("INSERT INTO license_assignments (license_id, asset_id, user_id) VALUES (?, ?, ?)");
                 $stmt->execute([$license_id, $asset_id, $user_id]);
-                log_action('license_assign', "Licença ID {$license_id} atribuída ao ativo ID {$asset_id}.");
-                $message = "Licença atribuída ao ativo com sucesso!";
+                log_action('license_assign', "Licença ID {$license_id} atribuída ao ativo ID {$asset_id}."); 
+                $_SESSION['message'] = "Licença atribuída ao ativo com sucesso!";
             } else {
                 throw new Exception("Não há postos (seats) disponíveis para esta licença.");
             }
@@ -79,12 +79,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $assignment_id = $_POST['assignment_id'];
             $stmt = $pdo->prepare("DELETE FROM license_assignments WHERE id = ?");
             $stmt->execute([$assignment_id]);
-            log_action('license_unassign', "Atribuição de licença ID {$assignment_id} removida.");
-            $message = "Atribuição de licença removida.";
+            log_action('license_unassign', "Atribuição de licença ID {$assignment_id} removida."); 
+            $_SESSION['message'] = "Atribuição de licença removida.";
         }
 
-    } catch (PDOException $e) {
-        $message = "error:Erro: " . $e->getMessage();
+    } catch (Exception $e) {
+        $_SESSION['message'] = "error:Erro: " . $e->getMessage();
     }
     // Redireciona para limpar o POST
     echo "<script>window.location.href = 'index.php?page=licenses';</script>";
@@ -174,12 +174,21 @@ function getLicenseStatus($exp_date, $seats_total = 1, $seats_used = 0) {
 </div>
 
 <!-- FEEDBACK -->
-<?php if($message): ?>
-    <div id="alertMessage" class="fixed top-4 right-4 z-[100] bg-white border-l-4 border-blue-500 px-6 py-4 rounded shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
-        <div class="text-blue-500"><i data-lucide="check-circle" class="w-5 h-5"></i></div><div><?php echo htmlspecialchars($message); ?></div>
+<?php if(isset($_SESSION['message'])): 
+    $is_error = strpos($_SESSION['message'], 'error:') === 0;
+    $message_text = $is_error ? substr($_SESSION['message'], 6) : $_SESSION['message'];
+    $message_class = $is_error ? 'border-red-500 text-red-700' : 'border-blue-500 text-blue-500';
+    $icon = $is_error ? 'alert-circle' : 'check-circle';
+?>
+    <div id="alertMessage" class="fixed top-4 right-4 z-[100] bg-white border-l-4 <?php echo $message_class; ?> px-6 py-4 rounded shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div class="<?php echo $message_class; ?>"><i data-lucide="<?php echo $icon; ?>" class="w-5 h-5"></i></div>
+        <div><?php echo htmlspecialchars($message_text); ?></div>
     </div>
     <script>setTimeout(() => document.getElementById('alertMessage')?.remove(), 4000);</script>
-<?php endif; ?>
+<?php 
+    unset($_SESSION['message']);
+endif; 
+?>
 
 <!-- TABELA -->
 <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">

@@ -381,8 +381,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $data = base64_decode($data);
                     if ($data !== false) {
                         $sigName = 'sig_' . uniqid() . '.png';
-                        $sigPath = dirname(__DIR__) . '/uploads/signatures/' . $sigName;
-                        if(file_put_contents($sigPath, $data)) $signature_url = 'uploads/signatures/' . $sigName;
+                        $target_dir = dirname(__DIR__) . '/uploads/signatures/';
+
+                        // Garante que o diretório exista e seja gravável
+                        if (!is_dir($target_dir)) {
+                            if (!mkdir($target_dir, 0777, true)) {
+                                throw new Exception("Falha ao criar o diretório de assinaturas. Verifique as permissões da pasta 'public/uploads'.");
+                            }
+                        }
+                        if (!is_writable($target_dir)) {
+                            throw new Exception("O diretório 'public/uploads/signatures/' não tem permissão de escrita. Ajuste as permissões no servidor.");
+                        }
+
+                        $sigPath = $target_dir . $sigName;
+                        if(!file_put_contents($sigPath, $data)) { throw new Exception("Não foi possível salvar o arquivo de assinatura."); }
+                        $signature_url = 'uploads/signatures/' . $sigName;
                     }
                 }
             }
@@ -774,7 +787,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             echo "<script>window.location.href = 'index.php?page=assets&id=$current_asset_id&tab=related';</script>"; exit;
         }
 
-    } catch (Exception $e) { $message = "Erro: " . $e->getMessage(); }
+    } catch (Exception $e) { 
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $message = "Erro: " . $e->getMessage(); 
+    }
 }
 
 // =================================================================================
