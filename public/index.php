@@ -85,10 +85,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     $data = base64_decode($data);
                     if ($data !== false) {
                         $sigName = 'sig_' . uniqid() . '.png';
-                        $target_dir = __DIR__ . '/uploads/signatures/';
+                        $target_dir = __DIR__ . '../uploads/signatures/';
                         if (!is_dir($target_dir)) @mkdir($target_dir, 0777, true);
                         if(file_put_contents($target_dir . $sigName, $data)) {
-                            $signature_url = 'uploads/signatures/' . $sigName;
+                            $signature_url = '../uploads/signatures/' . $sigName;
                         }
                     }
                 }
@@ -138,12 +138,12 @@ if (isset($_SESSION['message'])) {
 // ==========================================================
 $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
 $allowed_pages = ['dashboard', 'assets', 'movements', 'users', 'settings', 'companies', 'tickets', 'reports', 'suppliers', 'audit', 'scan', 'peripherals', 'licenses', 'integrations', 'ideas', 'idea_stats', 'profile', 'logs', 'log_dashboard']; 
-$page_file = "pages/{$page}.php";
+$page_file = "../pages/{$page}.php";
 
 if (in_array($page, $allowed_pages) && file_exists($page_file)) {
     $file_to_load = $page_file;
 } else {
-    $file_to_load = "pages/dashboard.php";
+    $file_to_load = "../pages/dashboard.php";
 }
 
 $user_name = $_SESSION['user_name'] ?? 'Utilizador';
