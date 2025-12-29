@@ -939,8 +939,8 @@ function getStatusColor($statusName) {
 ?>
 
 <!-- Inclui o modal de cadastro de ativo no início para garantir que as funções JS estejam disponíveis -->
-<?php include_once __DIR__ . '/../components/modal_asset.php'; ?>
-<?php include_once __DIR__ . '/../components/modal_bulk_edit.php'; ?>
+<?php include_once __DIR__ . '/components/modal_asset.php'; ?>
+<?php include_once __DIR__ . '/components/modal_bulk_edit.php'; ?>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>

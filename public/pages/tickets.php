@@ -139,14 +139,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // =================================================================================
 
 $pre_tickets = $pdo->query("SELECT t.*, a.name as asset_name, a.code as asset_code, l.name as location_name FROM tickets t JOIN assets a ON t.asset_id = a.id LEFT JOIN locations l ON a.location_id = l.id WHERE t.status = 'aberto' ORDER BY t.created_at ASC")->fetchAll();
-$active_tickets = $pdo->query("SELECT t.*, a.name as asset_name, a.code as asset_code, a.id as asset_id_real, l.name as location_name FROM tickets t JOIN assets a ON t.asset_id = a.id LEFT JOIN locations l ON a.location_id = l.id WHERE t.status != 'aberto' ORDER BY FIELD(t.status, 'em_execucao', 'aguardando', 'parado', 'concluido', 'cancelado'), t.created_at DESC")->fetchAll();
+$active_tickets = $pdo->query("SELECT t.*, a.name as asset_name, a.code as asset_code, a.id as asset_id_real, l.name as location_name FROM tickets t JOIN assets a ON t.asset_id = a.id LEFT JOIN locations l ON a.location_id = l.id WHERE t.status != 'aberto' ORDER BY CASE t.status WHEN 'em_execucao' THEN 1 WHEN 'aguardando' THEN 2 WHEN 'parado' THEN 3 WHEN 'concluido' THEN 4 WHEN 'cancelado' THEN 5 ELSE 6 END, t.created_at DESC")->fetchAll();
 $assets_list = $pdo->query("SELECT id, name, code FROM assets ORDER BY name ASC")->fetchAll();
 $locations = $pdo->query("SELECT id, name FROM locations ORDER BY name ASC")->fetchAll();
 $asset_statuses = $pdo->query("SELECT * FROM asset_statuses")->fetchAll();
 
 // KPIs
 $kpi_executing = $pdo->query("SELECT COUNT(*) FROM tickets WHERE status = 'em_execucao'")->fetchColumn();
-$kpi_finished_month = $pdo->query("SELECT COUNT(*) FROM tickets WHERE status = 'concluido' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())")->fetchColumn();
+
+// Compatibilidade PostgreSQL/MySQL para datas
+$driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+if ($driver === 'pgsql') {
+    $kpi_finished_month = $pdo->query("SELECT COUNT(*) FROM tickets WHERE status = 'concluido' AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)")->fetchColumn();
+} else {
+    $kpi_finished_month = $pdo->query("SELECT COUNT(*) FROM tickets WHERE status = 'concluido' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())")->fetchColumn();
+}
 
 
 // JSON para o seletor de ativos

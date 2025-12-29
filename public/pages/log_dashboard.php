@@ -61,10 +61,13 @@ try {
     ")->fetchAll(PDO::FETCH_KEY_PAIR);
 
     // Mapa de Calor de Atividades (por hora)
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $hour_expr = $driver === 'pgsql' ? "EXTRACT(HOUR FROM created_at)" : "HOUR(created_at)";
+
     $stmt_activity = $pdo->query("
-        SELECT HOUR(created_at) as hour, COUNT(*) as count 
+        SELECT $hour_expr as hour, COUNT(*) as count 
         FROM system_logs 
-        GROUP BY HOUR(created_at)
+        GROUP BY $hour_expr
     ");
     while ($row = $stmt_activity->fetch()) {
         $activity_by_hour[(int)$row['hour']] = (int)$row['count'];

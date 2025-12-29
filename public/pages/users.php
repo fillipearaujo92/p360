@@ -57,10 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if (isset($_FILES['photo']) && $_FILES['photo']['error'] == 0) {
                 $ext = pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION);
                 $new_name = uniqid('user_') . '.' . $ext;
-                $target_dir = dirname(__DIR__) . '/uploads/users';
+                $target_dir = dirname(__DIR__) . '../uploads/users';
                 if (!is_dir($target_dir)) @mkdir($target_dir, 0777, true);
                 if (move_uploaded_file($_FILES['photo']['tmp_name'], $target_dir . '/' . $new_name)) {
-                    $photo_url = 'uploads/users/' . $new_name;
+                    $photo_url = '../uploads/users/' . $new_name;
                 }
             }
 
@@ -93,11 +93,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if (isset($_FILES['photo']) && $_FILES['photo']['error'] == 0) {
                 $ext = pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION);
                 $new_name = uniqid('user_') . '.' . $ext;
-                $target_dir = dirname(__DIR__) . '/uploads/users';
+                $target_dir = dirname(__DIR__) . '../uploads/users';
                 if (!is_dir($target_dir)) @mkdir($target_dir, 0777, true);
                 if (move_uploaded_file($_FILES['photo']['tmp_name'], $target_dir . '/' . $new_name)) {
                     $photo_sql_part = ", photo_url=?";
-                    $params[] = 'uploads/users/' . $new_name;
+                    $params[] = '../uploads/users/' . $new_name;
                 }
             }
 

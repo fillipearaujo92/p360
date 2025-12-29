@@ -5,7 +5,7 @@
 
 // URL da API do AssetManager (Ajuste para o IP/Domínio real onde o AssetManager está hospedado)
 // Se estiver testando localmente, mantenha localhost. Em produção, use o IP do servidor.
-$api_endpoint = 'http://localhost/assetmanager/api.php';
+$api_endpoint = 'http://localhost/assetmanager/public/api.php';
 
 // Chave de API configurada no config.php do AssetManager
 $api_key = 'aleddesk_secret_key_12345';
@@ -113,7 +113,7 @@ if (isset($_GET['search_code']) && !empty($_GET['search_code'])) {
                     <?php if (!empty($result['photo_url'])): ?>
                         <div class="h-48 w-full bg-slate-200 relative">
                             <!-- Ajuste o caminho da imagem se necessário, pois a URL salva no banco pode ser relativa -->
-                            <img src="<?php echo strpos($result['photo_url'], 'http') === 0 ? $result['photo_url'] : 'http://localhost/assetmanager/' . $result['photo_url']; ?>" 
+                            <img src="<?php echo strpos($result['photo_url'], 'http') === 0 ? $result['photo_url'] : 'http://localhost/assetmanager/public/' . $result['photo_url']; ?>" 
                                  class="w-full h-full object-cover">
                         </div>
                     <?php endif; ?>

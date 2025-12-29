@@ -105,13 +105,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     // Upload Fotos
     $photo_urls = [];
     if (!empty($_FILES['photos']['name'][0])) {
-        if (!is_dir('uploads/tickets')) @mkdir('uploads/tickets', 0777, true);
+        if (!is_dir('../uploads/tickets')) @mkdir('uploads/tickets', 0777, true);
         foreach ($_FILES['photos']['name'] as $key => $name) {
             if ($_FILES['photos']['error'][$key] == 0) {
                 $ext = pathinfo($name, PATHINFO_EXTENSION);
                 $new_name = uniqid('ticket_') . '.' . $ext;
-                if (move_uploaded_file($_FILES['photos']['tmp_name'][$key], 'uploads/tickets/' . $new_name)) {
-                    $photo_urls[] = 'uploads/tickets/' . $new_name;
+                if (move_uploaded_file($_FILES['photos']['tmp_name'][$key], '../uploads/tickets/' . $new_name)) {
+                    $photo_urls[] = '../uploads/tickets/' . $new_name;
                 }
             }
         }
