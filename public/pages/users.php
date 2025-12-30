@@ -186,20 +186,44 @@ function getRoleBadge($role) {
 
 // Lista de Permissões Disponíveis
 $available_permissions = [
-    'create_asset' => 'Criar Ativos', 'edit_asset' => 'Editar Ativos', 'delete_asset' => 'Excluir Ativos',
-    'move_asset' => 'Movimentar Ativos', 'audit' => 'Realizar Auditorias', 'manage_peripherals' => 'Gerenciar Periféricos',
-    'manage_licenses' => 'Gerenciar Licenças', 'manage_suppliers' => 'Gerenciar Fornecedores',
-    'manage_users' => 'Gerenciar Usuários', 'view_reports' => 'Visualizar Relatórios'
+    'Ativos' => [
+        'create_asset' => 'Criar Ativos',
+        'edit_asset' => 'Editar Ativos',
+        'delete_asset' => 'Excluir Ativos',
+        'move_asset' => 'Movimentar Ativos',
+        'import_assets' => 'Importar Ativos (CSV)',
+        'export_assets' => 'Exportar Relatórios de Ativos',
+        'bulk_actions' => 'Ações em Massa (Editar/Excluir/Transferir)',
+    ],
+    'Gerenciamento' => [
+        'manage_peripherals' => 'Gerenciar Estoque/Consumíveis',
+        'manage_licenses' => 'Gerenciar Licenças de Software',
+        'manage_suppliers' => 'Gerenciar Fornecedores',
+    ],
+    'Auditoria & Relatórios' => [
+        'audit' => 'Realizar Auditorias',
+        'view_reports' => 'Visualizar Relatórios',
+        'view_logs' => 'Visualizar Logs do Sistema',
+    ],
+    'Administração' => [
+        'manage_users' => 'Gerenciar Usuários',
+        'manage_roles' => 'Gerenciar Funções e Permissões',
+        'manage_companies' => 'Gerenciar Empresas, Setores e Categorias',
+        'system_maintenance' => 'Realizar Manutenção do Sistema (Backup, etc)',
+    ]
 ];
 ?>
 
 <!-- FEEDBACK -->
 <?php if($message): ?>
-    <div id="alertMessage" class="fixed top-4 right-4 z-[100] bg-white border-l-4 border-blue-500 px-6 py-4 rounded shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
-        <div class="<?php echo strpos($message, 'Erro') !== false ? 'text-red-500' : 'text-blue-500'; ?>">
-            <i data-lucide="<?php echo strpos($message, 'Erro') !== false ? 'alert-circle' : 'check-circle'; ?>" class="w-5 h-5"></i>
+    <div id="alertMessage" class="fixed bottom-4 right-4 z-[100] bg-white border-l-4 <?php echo strpos($message, 'Erro') !== false ? 'border-red-500' : 'border-blue-500'; ?> px-6 py-4 rounded shadow-lg flex items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div class="flex items-center gap-3">
+            <div class="<?php echo strpos($message, 'Erro') !== false ? 'text-red-500' : 'text-blue-500'; ?>">
+                <i data-lucide="<?php echo strpos($message, 'Erro') !== false ? 'alert-circle' : 'check-circle'; ?>" class="w-5 h-5"></i>
+            </div>
+            <div><?php echo $message; ?></div>
         </div>
-        <div><?php echo $message; ?></div>
+        <button onclick="this.parentElement.remove()" class="p-1 text-slate-400 hover:text-slate-600 rounded-full -mr-2 -my-2"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
     <script>setTimeout(() => { const el = document.getElementById('alertMessage'); if(el) el.remove(); }, 4000);</script>
 <?php endif; ?>
@@ -393,16 +417,19 @@ $available_permissions = [
 <!-- MODAL PERMISSÕES -->
 <div id="modalPermissions" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
     <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity opacity-0 modal-backdrop" onclick="closeModal('modalPermissions')"></div>
-    <div class="relative w-full max-w-lg bg-white rounded-xl shadow-xl transform scale-95 opacity-0 modal-panel transition-all flex flex-col max-h-[90vh]">
+    <div class="relative w-full max-w-3xl bg-white rounded-xl shadow-xl transform scale-95 opacity-0 modal-panel transition-all flex flex-col max-h-[90vh]">
         <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-xl">
-            <h3 class="text-lg font-bold text-slate-900">Configurar Funções</h3>
+            <div>
+                <h3 class="text-lg font-bold text-slate-900">Configurar Funções</h3>
+                <p class="text-sm text-slate-500">Defina o que cada função pode fazer no sistema.</p>
+            </div>
             <button onclick="closeModal('modalPermissions')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
-        <div class="p-6">
+        <div class="p-6 flex-1 overflow-y-auto">
             <div class="mb-4">
-                <label class="block text-sm font-bold text-slate-700 mb-2">Selecione a Função</label>
+                <label class="block text-sm font-bold text-slate-700 mb-2">Selecione a Função para Editar</label>
                 <select id="roleSelector" onchange="loadRolePermissions()" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-slate-50">
-                    <option value="admin">Admin</option>
+                    <option value="admin" disabled>Admin (Acesso Total)</option>
                     <option value="gestor">Gestor</option>
                     <option value="tecnico">Técnico</option>
                     <option value="leitor">Leitor</option>
@@ -411,12 +438,33 @@ $available_permissions = [
             <form method="POST" id="permissionsForm">
                 <input type="hidden" name="action" value="save_permissions">
                 <input type="hidden" name="role_key" id="permRoleKey">
-                <div class="grid grid-cols-2 gap-3 mb-6">
-                    <?php foreach($available_permissions as $key => $label): ?>
-                        <label class="flex items-center gap-2 p-2 border rounded hover:bg-slate-50 cursor-pointer"><input type="checkbox" name="permissions[]" value="<?php echo $key; ?>" class="rounded text-blue-600 focus:ring-blue-500 perm-checkbox"> <span class="text-sm text-slate-700"><?php echo $label; ?></span></label>
+                
+                <div class="space-y-6">
+                    <?php foreach($available_permissions as $group => $permissions): ?>
+                        <fieldset class="border border-slate-200 p-4 rounded-lg">
+                            <legend class="text-sm font-bold text-blue-600 px-2 bg-white -ml-2"><?php echo $group; ?></legend>
+                            <div class="mb-3 border-b border-slate-100 pb-3">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" onchange="toggleGroup(this, '<?php echo strtolower(str_replace(' ', '_', $group)); ?>')" class="rounded text-blue-600 focus:ring-blue-500">
+                                    <span class="text-sm font-semibold text-slate-700">Marcar todos</span>
+                                </label>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                                <?php foreach($permissions as $key => $label): ?>
+                                    <label class="flex items-center gap-2 p-1 rounded hover:bg-slate-50 cursor-pointer">
+                                        <input type="checkbox" name="permissions[]" value="<?php echo $key; ?>" data-group="<?php echo strtolower(str_replace(' ', '_', $group)); ?>" onchange="checkGroupStatus('<?php echo strtolower(str_replace(' ', '_', $group)); ?>')" class="rounded text-blue-600 focus:ring-blue-500 perm-checkbox">
+                                        <span class="text-sm text-slate-700"><?php echo $label; ?></span>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </fieldset>
                     <?php endforeach; ?>
                 </div>
-                <div class="flex justify-end gap-2"><button type="button" onclick="closeModal('modalPermissions')" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button><button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Salvar Permissões</button></div>
+
+                <div class="mt-6 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('modalPermissions')" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Salvar Permissões</button>
+                </div>
             </form>
         </div>
     </div>

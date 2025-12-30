@@ -126,7 +126,7 @@ if (isset($_SESSION['message'])) {
             text: \"{$message_text}\",
             duration: 5000,
             close: true,
-            gravity: 'top',
+            gravity: 'bottom',
             position: 'right',
             style: { background: {$background_color} }
         }).showToast();
@@ -274,8 +274,8 @@ function generate_nav_dropdown($label, $icon, $children, $current_page) {
         <!-- Logo -->
         <div class="p-6 border-b border-blue-700 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <div class="bg-white/20 text-white p-2 rounded-lg">
-                    <i data-lucide="codesandbox" class="w-6 h-6"></i>
+                <div class="">
+                    <img src="src/Logo P360 Branco.png" alt="Patrimônio 360º Logo" class="w-16 h-16 object-contain">
                 </div>
                 <span class="font-bold text-xl text-white tracking-tight nav-text">Patrimônio 360º</span>
             </div>

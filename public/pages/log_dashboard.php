@@ -61,16 +61,27 @@ try {
     ")->fetchAll(PDO::FETCH_KEY_PAIR);
 
     // Mapa de Calor de Atividades (por hora)
-    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-    $hour_expr = $driver === 'pgsql' ? "EXTRACT(HOUR FROM created_at)" : "HOUR(created_at)";
-
-    $stmt_activity = $pdo->query("
-        SELECT $hour_expr as hour, COUNT(*) as count 
-        FROM system_logs 
-        GROUP BY $hour_expr
-    ");
+    // CORREÇÃO: Traz a data crua e converte para o Fuso Brasil no PHP
+    $stmt_activity = $pdo->query("SELECT created_at FROM system_logs");
+    
     while ($row = $stmt_activity->fetch()) {
-        $activity_by_hour[(int)$row['hour']] = (int)$row['count'];
+        try {
+            // 1. Cria a data com o valor do banco
+            $dt = new DateTime($row['created_at']);
+            
+            // 2. Força a conversão para o horário de Brasília
+            $dt->setTimezone(new DateTimeZone('America/Sao_Paulo'));
+            
+            // 3. Extrai a hora correta (00-23)
+            $hour = (int)$dt->format('H');
+            
+            // 4. Incrementa o contador daquela hora
+            $activity_by_hour[$hour]++;
+            
+        } catch (Exception $e) {
+            // Ignora datas inválidas
+            continue;
+        }
     }
 
 } catch (Exception $e) {
@@ -116,7 +127,7 @@ $js_activity_data = json_encode(array_values($activity_by_hour));
 
     <!-- Mapa de Calor de Atividade -->
     <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <h3 class="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-slate-400"></i> Atividade por Hora do Dia (UTC)</h3>
+        <h3 class="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-slate-400"></i> Atividade por Hora do Dia</h3>
         <div class="grid grid-cols-12 md:grid-cols-24 gap-1">
             <?php
                 $max_activity = max($activity_by_hour) ?: 1;

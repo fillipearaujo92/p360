@@ -70,9 +70,13 @@ if ($peripheral_id) {
 
         // Busca paginada
         $query = "
-            SELECT pm.*, u.name as user_name
+            SELECT pm.*, u.name as user_name,
+                   a_to.name as to_asset_name, a_to.code as to_asset_code,
+                   a_from.name as from_asset_name, a_from.code as from_asset_code
             FROM peripheral_movements pm
             LEFT JOIN users u ON pm.user_id = u.id
+            LEFT JOIN assets a_to ON pm.to_asset_id = a_to.id
+            LEFT JOIN assets a_from ON pm.from_asset_id = a_from.id
             WHERE $where_sql
             ORDER BY pm.created_at DESC
             LIMIT $items_per_page OFFSET $offset
@@ -206,7 +210,15 @@ if ($peripheral_id) {
                         <i data-lucide="arrow-right-left" class="w-3 h-3 text-blue-500"></i>
                     </div>
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <p class="text-sm font-medium text-slate-800"><?php echo htmlspecialchars($mov['reason']); ?></p>
+                        <div class="text-sm font-medium text-slate-800">
+                            <?php echo htmlspecialchars($mov['reason']); ?>
+                            <?php if(!empty($mov['to_asset_code'])): ?>
+                                <span class="text-xs text-slate-500 ml-1 block sm:inline"> &rarr; <?php echo htmlspecialchars($mov['to_asset_name']); ?> (<?php echo htmlspecialchars($mov['to_asset_code']); ?>)</span>
+                            <?php endif; ?>
+                            <?php if(!empty($mov['from_asset_code'])): ?>
+                                <span class="text-xs text-slate-500 ml-1 block sm:inline"> &larr; <?php echo htmlspecialchars($mov['from_asset_name']); ?> (<?php echo htmlspecialchars($mov['from_asset_code']); ?>)</span>
+                            <?php endif; ?>
+                        </div>
                         <span class="font-bold text-lg <?php echo $change_class; ?> px-2 py-1 rounded-md text-xs flex items-center gap-1 w-fit">
                             <i data-lucide="<?php echo $icon; ?>" class="w-3 h-3"></i> <?php echo abs($mov['change_amount']); ?>
                         </span>

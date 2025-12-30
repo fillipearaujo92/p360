@@ -170,8 +170,11 @@ $statuses = $pdo->query("SELECT * FROM asset_statuses")->fetchAll();
 </div>
 
 <?php if(isset($_SESSION['message'])): ?>
-    <div id="alertMessage" class="bg-green-100 border-l-4 border-green-500 text-green-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2 shadow-sm">
-        <i data-lucide="check-circle" class="w-5 h-5"></i> <?php echo $_SESSION['message']; ?>
+    <div id="alertMessage" class="fixed bottom-4 right-4 z-[100] bg-green-100 border-l-4 border-green-500 text-green-700 px-4 py-3 rounded-lg flex items-center justify-between gap-4 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div class="flex items-center gap-2">
+            <i data-lucide="check-circle" class="w-5 h-5"></i> <?php echo $_SESSION['message']; ?>
+        </div>
+        <button onclick="this.parentElement.remove()" class="p-1 text-green-700/50 hover:text-green-700 rounded-full -mr-2 -my-2"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
     <script>setTimeout(() => document.getElementById('alertMessage')?.remove(), 4000);</script>
     <?php unset($_SESSION['message']); ?>

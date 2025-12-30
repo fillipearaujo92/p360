@@ -2,9 +2,44 @@
 // pages/logs.php
 
 // Apenas Admin
-if ($_SESSION['user_role'] !== 'admin') {
+if (strtolower($_SESSION['user_role'] ?? '') !== 'admin') {
     echo "<div class='p-4 text-red-600 bg-red-50 rounded-lg border border-red-200'>Acesso negado. Apenas administradores podem visualizar os logs.</div>";
     return;
+}
+
+// pages/logs.php
+
+// Função para converter data em tempo relativo (Corrigida para Fuso Brasil)
+function time_ago($datetime) {
+    try {
+        // Define explicitamente o fuso horário do Brasil
+        $tz = new DateTimeZone('America/Sao_Paulo');
+        
+        // Cria a data do log assumindo que ela veio do banco
+        $dt = new DateTime($datetime, $tz);
+        
+        // Cria a data de "Agora" no mesmo fuso
+        $now = new DateTime('now', $tz);
+        
+        // Calcula a diferença real em segundos
+        $diff = $now->getTimestamp() - $dt->getTimestamp();
+    } catch (Exception $e) {
+        return $datetime; // Fallback em caso de erro
+    }
+
+    if ($diff < 60) { return 'agora mesmo'; }
+    
+    $min = round($diff / 60);
+    if ($min < 60) { return 'há ' . $min . ' minuto' . ($min > 1 ? 's' : ''); }
+    
+    $hour = round($diff / 3600);
+    if ($hour < 24) { return 'há ' . $hour . ' hora' . ($hour > 1 ? 's' : ''); }
+    
+    $day = round($diff / 86400);
+    if ($day < 7) { return $day == 1 ? 'ontem' : 'há ' . $day . ' dias'; }
+    
+    // Retorna formatado no padrão brasileiro
+    return $dt->format('d/m/Y H:i');
 }
 
 // --- LÓGICA DE REVERSÃO DE STATUS ---
@@ -22,14 +57,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $stmtUpd = $pdo->prepare("UPDATE assets SET status = ? WHERE id = ?");
             $stmtUpd->execute([$target_status, $asset['id']]);
             
-            $stmtLog = $pdo->prepare("INSERT INTO system_logs (user_id, action, description, ip_address) VALUES (?, ?, ?, ?)");
-            $stmtLog->execute([$_SESSION['user_id'] ?? null, 'asset_status_change', "Status do ativo '{$asset['name']}' ({$code}) revertido para '{$target_status}' via Painel de Logs.", $_SERVER['REMOTE_ADDR']]);
-            echo "<div id='toast' class='fixed top-4 right-4 z-50 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-lg flex items-center gap-2'><i data-lucide='check-circle' class='w-5 h-5'></i> Status revertido com sucesso!</div><script>setTimeout(()=>document.getElementById('toast').remove(), 4000);</script>";
+            log_action('asset_status_change', "Status do ativo '{$asset['name']}' ({$code}) revertido para '{$target_status}' via Painel de Logs.");
+            echo "<div id='toast' class='fixed bottom-4 right-4 z-50 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-lg flex items-center justify-between gap-4'><div class='flex items-center gap-2'><i data-lucide='check-circle' class='w-5 h-5'></i> Status revertido com sucesso!</div><button onclick='this.parentElement.remove()' class='p-1 text-green-700/50 hover:text-green-700 rounded-full -mr-2 -my-2'><i data-lucide='x' class='w-4 h-4'></i></button></div><script>setTimeout(()=>document.getElementById('toast')?.remove(), 4000);</script>";
         } else {
             throw new Exception("Ativo com código '{$code}' não encontrado.");
         }
     } catch (Exception $e) {
-        echo "<div id='toast' class='fixed top-4 right-4 z-50 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-lg flex items-center gap-2'><i data-lucide='alert-circle' class='w-5 h-5'></i> Erro: " . $e->getMessage() . "</div><script>setTimeout(()=>document.getElementById('toast').remove(), 4000);</script>";
+        echo "<div id='toast' class='fixed bottom-4 right-4 z-50 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-lg flex items-center justify-between gap-4'><div class='flex items-center gap-2'><i data-lucide='alert-circle' class='w-5 h-5'></i> Erro: " . $e->getMessage() . "</div><button onclick='this.parentElement.remove()' class='p-1 text-red-700/50 hover:text-red-700 rounded-full -mr-2 -my-2'><i data-lucide='x' class='w-4 h-4'></i></button></div><script>setTimeout(()=>document.getElementById('toast')?.remove(), 4000);</script>";
     }
 }
 
@@ -50,6 +84,8 @@ try {
 // Filtros
 $action_filter = $_GET['action'] ?? '';
 $user_filter = $_GET['user'] ?? '';
+$date_start = $_GET['date_start'] ?? '';
+$date_end = $_GET['date_end'] ?? '';
 
 $where = ["1=1"];
 $params = [];
@@ -59,8 +95,17 @@ if ($action_filter) {
     $params[] = $action_filter;
 }
 if ($user_filter) {
-    $where[] = "u.name LIKE ?";
+    $where[] = "(u.name LIKE ? OR u.role LIKE ?)";
     $params[] = "%$user_filter%";
+    $params[] = "%$user_filter%";
+}
+if ($date_start) {
+    $where[] = "DATE(l.created_at) >= ?";
+    $params[] = $date_start;
+}
+if ($date_end) {
+    $where[] = "DATE(l.created_at) <= ?";
+    $params[] = $date_end;
 }
 
 // Paginação
@@ -102,65 +147,93 @@ $logs = $stmt->fetchAll();
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col">
     <!-- Filters Toolbar -->
     <div class="p-5 border-b border-slate-100 bg-slate-50/50">
-        <form class="flex flex-col sm:flex-row gap-4">
+        <form class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 items-end">
             <input type="hidden" name="page" value="logs">
-            <div class="relative min-w-[200px]">
-                <i data-lucide="filter" class="absolute left-3 top-3 w-4 h-4 text-slate-400"></i>
-                <select name="action" onchange="this.form.submit()" class="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none cursor-pointer hover:border-slate-300 transition-colors">
-                    <option value="">Todas as Ações</option>
-                    <optgroup label="Segurança">
-                        <option value="login_success" <?php echo $action_filter == 'login_success' ? 'selected' : ''; ?>>Login com Sucesso</option>
-                        <option value="login_failed" <?php echo $action_filter == 'login_failed' ? 'selected' : ''; ?>>Login Falhou</option>
-                        <option value="backup" <?php echo $action_filter == 'backup' ? 'selected' : ''; ?>>Backup do Sistema</option>
-                        <option value="permission_update" <?php echo $action_filter == 'permission_update' ? 'selected' : ''; ?>>Permissões</option>
-                    </optgroup>
-                    <optgroup label="Ativos">
-                        <option value="asset_create" <?php echo $action_filter == 'asset_create' ? 'selected' : ''; ?>>Criação de Ativo</option>
-                        <option value="asset_update" <?php echo $action_filter == 'asset_update' ? 'selected' : ''; ?>>Edição de Ativo</option>
-                        <option value="asset_delete" <?php echo $action_filter == 'asset_delete' ? 'selected' : ''; ?>>Exclusão de Ativo</option>
-                        <option value="asset_move" <?php echo $action_filter == 'asset_move' ? 'selected' : ''; ?>>Movimentação</option>
-                        <option value="asset_status_change" <?php echo $action_filter == 'asset_status_change' ? 'selected' : ''; ?>>Mudança de Status</option>
-                        <option value="asset_transfer" <?php echo $action_filter == 'asset_transfer' ? 'selected' : ''; ?>>Transferência</option>
-                    </optgroup>
-                    <optgroup label="Usuários">
-                        <option value="user_create" <?php echo $action_filter == 'user_create' ? 'selected' : ''; ?>>Criação de Usuário</option>
-                        <option value="user_update" <?php echo $action_filter == 'user_update' ? 'selected' : ''; ?>>Edição de Usuário</option>
-                        <option value="user_delete" <?php echo $action_filter == 'user_delete' ? 'selected' : ''; ?>>Exclusão de Usuário</option>
-                        <option value="profile_update" <?php echo $action_filter == 'profile_update' ? 'selected' : ''; ?>>Edição de Perfil</option>
-                    </optgroup>
-                    <optgroup label="Auditoria">
-                        <option value="audit_start" <?php echo $action_filter == 'audit_start' ? 'selected' : ''; ?>>Início de Auditoria</option>
-                        <option value="audit_finish" <?php echo $action_filter == 'audit_finish' ? 'selected' : ''; ?>>Fim de Auditoria</option>
-                        <option value="audit_scan" <?php echo $action_filter == 'audit_scan' ? 'selected' : ''; ?>>Scan Realizado</option>
-                    </optgroup>
-                </select>
+            
+            <!-- Filtro de Ação -->
+            <div class="lg:col-span-3">
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Tipo de Ação</label>
+                <div class="relative">
+                    <i data-lucide="filter" class="absolute left-3 top-3 w-4 h-4 text-slate-400"></i>
+                    <select name="action" onchange="this.form.submit()" class="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none cursor-pointer hover:border-slate-300 transition-colors shadow-sm">
+                        <option value="">Todas as Ações</option>
+                        <optgroup label="Segurança">
+                            <option value="login_success" <?php echo $action_filter == 'login_success' ? 'selected' : ''; ?>>Login com Sucesso</option>
+                            <option value="login_failed" <?php echo $action_filter == 'login_failed' ? 'selected' : ''; ?>>Login Falhou</option>
+                            <option value="backup" <?php echo $action_filter == 'backup' ? 'selected' : ''; ?>>Backup do Sistema</option>
+                            <option value="permission_update" <?php echo $action_filter == 'permission_update' ? 'selected' : ''; ?>>Permissões</option>
+                        </optgroup>
+                        <optgroup label="Ativos">
+                            <option value="asset_create" <?php echo $action_filter == 'asset_create' ? 'selected' : ''; ?>>Criação de Ativo</option>
+                            <option value="asset_update" <?php echo $action_filter == 'asset_update' ? 'selected' : ''; ?>>Edição de Ativo</option>
+                            <option value="asset_delete" <?php echo $action_filter == 'asset_delete' ? 'selected' : ''; ?>>Exclusão de Ativo</option>
+                            <option value="asset_move" <?php echo $action_filter == 'asset_move' ? 'selected' : ''; ?>>Movimentação</option>
+                            <option value="asset_status_change" <?php echo $action_filter == 'asset_status_change' ? 'selected' : ''; ?>>Mudança de Status</option>
+                            <option value="asset_transfer" <?php echo $action_filter == 'asset_transfer' ? 'selected' : ''; ?>>Transferência</option>
+                        </optgroup>
+                        <optgroup label="Usuários">
+                            <option value="user_create" <?php echo $action_filter == 'user_create' ? 'selected' : ''; ?>>Criação de Usuário</option>
+                            <option value="user_update" <?php echo $action_filter == 'user_update' ? 'selected' : ''; ?>>Edição de Usuário</option>
+                            <option value="user_delete" <?php echo $action_filter == 'user_delete' ? 'selected' : ''; ?>>Exclusão de Usuário</option>
+                            <option value="profile_update" <?php echo $action_filter == 'profile_update' ? 'selected' : ''; ?>>Edição de Perfil</option>
+                        </optgroup>
+                        <optgroup label="Auditoria">
+                            <option value="audit_start" <?php echo $action_filter == 'audit_start' ? 'selected' : ''; ?>>Início de Auditoria</option>
+                            <option value="audit_finish" <?php echo $action_filter == 'audit_finish' ? 'selected' : ''; ?>>Fim de Auditoria</option>
+                            <option value="audit_scan" <?php echo $action_filter == 'audit_scan' ? 'selected' : ''; ?>>Scan Realizado</option>
+                        </optgroup>
+                    </select>
+                </div>
             </div>
             
-            <div class="relative flex-1">
-                <i data-lucide="search" class="absolute left-3 top-3 w-4 h-4 text-slate-400"></i>
-                <input type="text" name="user" value="<?php echo htmlspecialchars($user_filter); ?>" placeholder="Buscar por nome de usuário..." class="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none hover:border-slate-300 transition-colors">
+            <!-- Filtro de Usuário -->
+            <div class="lg:col-span-3">
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Usuário</label>
+                <div class="relative">
+                    <i data-lucide="search" class="absolute left-3 top-3 w-4 h-4 text-slate-400"></i>
+                    <input type="text" name="user" value="<?php echo htmlspecialchars($user_filter); ?>" placeholder="Buscar usuário..." class="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none hover:border-slate-300 transition-colors shadow-sm">
+                </div>
             </div>
             
-            <div class="relative w-full sm:w-auto min-w-[130px]">
-                <select name="limit" onchange="this.form.submit()" class="w-full pl-3 pr-8 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none cursor-pointer hover:border-slate-300 transition-colors">
-                    <option value="10" <?php echo $limit == 10 ? 'selected' : ''; ?>>10 por pág.</option>
-                    <option value="20" <?php echo $limit == 20 ? 'selected' : ''; ?>>20 por pág.</option>
-                    <option value="50" <?php echo $limit == 50 ? 'selected' : ''; ?>>50 por pág.</option>
-                    <option value="100" <?php echo $limit == 100 ? 'selected' : ''; ?>>100 por pág.</option>
-                </select>
-                <i data-lucide="chevron-down" class="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none"></i>
+            <!-- Filtro de Data -->
+            <div class="lg:col-span-2">
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Data Inicial</label>
+                <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none hover:border-slate-300 transition-colors shadow-sm text-slate-600">
             </div>
+            <div class="lg:col-span-2">
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Data Final</label>
+                <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none hover:border-slate-300 transition-colors shadow-sm text-slate-600">
+            </div>
+            
+            <!-- Botões e Limite -->
+            <div class="lg:col-span-2 flex gap-2">
+                <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2" title="Aplicar Filtros">
+                    <i data-lucide="search" class="w-4 h-4"></i>
+                </button>
+                
+                <?php if($action_filter || $user_filter || $date_start || $date_end): ?>
+                <a href="?page=logs" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 py-2.5 rounded-lg text-sm font-medium transition-all shadow-sm flex items-center justify-center" title="Limpar Filtros">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </a>
+                <?php endif; ?>
 
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2">
-                Filtrar Resultados
-            </button>
+                <div class="relative w-20">
+                    <select name="limit" onchange="this.form.submit()" class="w-full pl-2 pr-6 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none cursor-pointer hover:border-slate-300 transition-colors shadow-sm text-center">
+                        <option value="10" <?php echo $limit == 10 ? 'selected' : ''; ?>>10</option>
+                        <option value="20" <?php echo $limit == 20 ? 'selected' : ''; ?>>20</option>
+                        <option value="50" <?php echo $limit == 50 ? 'selected' : ''; ?>>50</option>
+                        <option value="100" <?php echo $limit == 100 ? 'selected' : ''; ?>>100</option>
+                    </select>
+                    <i data-lucide="chevron-down" class="absolute right-2 top-3 w-3 h-3 text-slate-400 pointer-events-none"></i>
+                </div>
+            </div>
         </form>
     </div>
 
     <!-- Table -->
     <div class="overflow-x-auto">
         <table class="w-full text-sm text-left">
-            <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-xs">
+            <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-xs sticky top-0 z-10">
                 <tr>
                     <th class="px-6 py-4 w-20">ID</th>
                     <th class="px-6 py-4 w-48">Data/Hora</th>
@@ -207,9 +280,15 @@ $logs = $stmt->fetchAll();
                 ?>
                 <tr class="hover:bg-slate-50/80 transition-colors group">
                     <td class="px-6 py-4 text-slate-400 font-mono text-xs">#<?php echo $log['id']; ?></td>
-                    <td class="px-6 py-4 text-slate-600 whitespace-nowrap text-xs">
-                        <div class="font-medium"><?php echo date('d/m/Y', strtotime($log['created_at'])); ?></div>
-                        <div class="text-slate-400"><?php echo date('H:i:s', strtotime($log['created_at'])); ?></div>
+                    <td class="px-6 py-4 text-slate-600 whitespace-nowrap text-sm" title="<?php echo htmlspecialchars(time_ago($log['created_at'])); ?>">
+                        <?php
+                            try {
+                                $dt = new DateTime($log['created_at']);
+                                echo $dt->format('d/m/Y H:i:s');
+                            } catch (Exception $e) {
+                                echo date('d/m/Y H:i:s', strtotime($log['created_at'])); // Fallback
+                            }
+                        ?>
                     </td>
                     <td class="px-6 py-4">
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ring-1 ring-inset <?php echo $cls; ?>">
@@ -222,7 +301,15 @@ $logs = $stmt->fetchAll();
                                 <?php echo strtoupper(substr($log['user_name'] ?? 'S', 0, 1)); ?>
                             </div>
                             <div>
-                                <div class="font-medium text-slate-700 text-sm"><?php echo htmlspecialchars($log['user_name'] ?? 'Sistema/Visitante'); ?></div>
+                                <div class="font-medium text-slate-700 text-sm">
+                                    <?php 
+                                    $display_name = $log['user_name'] ?? 'Sistema/Visitante';
+                                    if (empty($log['user_name']) && !empty($log['user_id'])) {
+                                        $display_name = "Usuário #{$log['user_id']} (Removido)";
+                                    }
+                                    echo htmlspecialchars($display_name); 
+                                    ?>
+                                </div>
                         <?php if(!empty($log['user_role'])): ?>
                                     <div class="text-[10px] text-slate-400 uppercase tracking-wide"><?php echo htmlspecialchars($log['user_role']); ?></div>
                         <?php endif; ?>

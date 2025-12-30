@@ -97,9 +97,12 @@ $user = $stmt->fetch();
     $msg_class = $is_error ? 'border-red-500 text-red-500' : 'border-blue-500 text-blue-500';
     $icon = $is_error ? 'alert-circle' : 'check-circle';
 ?>
-    <div id="alertMessage" class="fixed top-4 right-4 z-[100] bg-white border-l-4 <?php echo $msg_class; ?> px-6 py-4 rounded shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
-        <div class="<?php echo $msg_class; ?>"><i data-lucide="<?php echo $icon; ?>" class="w-5 h-5"></i></div>
-        <div><?php echo htmlspecialchars($msg_text); ?></div>
+    <div id="alertMessage" class="fixed bottom-4 right-4 z-[100] bg-white border-l-4 <?php echo $msg_class; ?> px-6 py-4 rounded shadow-lg flex items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div class="flex items-center gap-3">
+            <div class="<?php echo $msg_class; ?>"><i data-lucide="<?php echo $icon; ?>" class="w-5 h-5"></i></div>
+            <div><?php echo htmlspecialchars($msg_text); ?></div>
+        </div>
+        <button onclick="this.parentElement.remove()" class="p-1 text-slate-400 hover:text-slate-600 rounded-full -mr-2 -my-2"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
     <script>setTimeout(() => document.getElementById('alertMessage')?.remove(), 4000);</script>
 <?php endif; ?>

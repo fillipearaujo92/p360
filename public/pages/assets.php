@@ -722,7 +722,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $stmtName = $pdo->prepare("SELECT name, code FROM assets WHERE id = ?"); $stmtName->execute([$asset_id]); $asset_data = $stmtName->fetch();
                 $reason = "Vinculado ao ativo: " . ($asset_data['name'] ?: "ID $asset_id");
                 $new_qty = $stock - $quantity;
-                $pdo->prepare("INSERT INTO peripheral_movements (peripheral_id, user_id, change_amount, new_quantity, reason, created_at) VALUES (?, ?, ?, ?, ?, NOW())")->execute([$peripheral_id, $user_id, -$quantity, $new_qty, $reason]);
+                $pdo->prepare("INSERT INTO peripheral_movements (peripheral_id, user_id, change_amount, new_quantity, reason, to_asset_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())")->execute([$peripheral_id, $user_id, -$quantity, $new_qty, $reason, $asset_id]);
 
                 $stmtPName = $pdo->prepare("SELECT name FROM peripherals WHERE id = ?"); $stmtPName->execute([$peripheral_id]); $p_name = $stmtPName->fetchColumn();
                 log_action('asset_update', "Acessório '{$p_name}' (Qtd: {$quantity}) vinculado ao ativo '{$asset_data['name']}' ({$asset_data['code']}).");
@@ -749,7 +749,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $stmtName = $pdo->prepare("SELECT name, code FROM assets WHERE id = ?"); $stmtName->execute([$asset_id]); $asset_data = $stmtName->fetch();
                 $reason = "Devolvido do ativo: " . ($asset_data['name'] ?: "ID $asset_id");
                 $new_qty = $curr_stock + $assignment['quantity_assigned'];
-                $pdo->prepare("INSERT INTO peripheral_movements (peripheral_id, user_id, change_amount, new_quantity, reason, created_at) VALUES (?, ?, ?, ?, ?, NOW())")->execute([$assignment['peripheral_id'], $user_id, $assignment['quantity_assigned'], $new_qty, $reason]);
+                $pdo->prepare("INSERT INTO peripheral_movements (peripheral_id, user_id, change_amount, new_quantity, reason, from_asset_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())")->execute([$assignment['peripheral_id'], $user_id, $assignment['quantity_assigned'], $new_qty, $reason, $asset_id]);
 
                 $stmtPName = $pdo->prepare("SELECT name FROM peripherals WHERE id = ?"); $stmtPName->execute([$assignment['peripheral_id']]); $p_name = $stmtPName->fetchColumn();
                 log_action('asset_update', "Acessório '{$p_name}' desvinculado do ativo '{$asset_data['name']}' ({$asset_data['code']}).");
@@ -946,11 +946,11 @@ $all_assets_json = json_encode($all_assets);
 
 function getStatusColor($statusName) {
     $s = strtolower(trim($statusName));
-    if(strpos($s, 'ativo') !== false || strpos($s, 'dispon') !== false) return 'bg-green-100 text-green-700 border border-green-200';
-    if(strpos($s, 'manuten') !== false || strpos($s, 'reparo') !== false) return 'bg-orange-100 text-orange-700 border border-orange-200';
-    if(strpos($s, 'uso') !== false || strpos($s, 'alocado') !== false) return 'bg-blue-100 text-blue-700 border border-blue-200';
-    if(strpos($s, 'baixado') !== false || strpos($s, 'roubado') !== false) return 'bg-red-100 text-red-700 border border-red-200';
-    return 'bg-slate-100 text-slate-600 border border-slate-200';
+    if(strpos($s, 'ativo') !== false || strpos($s, 'dispon') !== false) return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+    if(strpos($s, 'manuten') !== false || strpos($s, 'reparo') !== false) return 'bg-amber-100 text-amber-800 border border-amber-200';
+    if(strpos($s, 'uso') !== false || strpos($s, 'alocado') !== false) return 'bg-sky-100 text-sky-800 border border-sky-200';
+    if(strpos($s, 'baixado') !== false || strpos($s, 'roubado') !== false || strpos($s, 'descartado') !== false) return 'bg-rose-100 text-rose-800 border border-rose-200';
+    return 'bg-slate-100 text-slate-700 border border-slate-200';
 }
 ?>
 
@@ -990,8 +990,12 @@ function getStatusColor($statusName) {
 </script>
 
 <?php if($message): ?>
-    <div id="alertMessage" class="fixed top-4 right-4 z-[100] bg-white border-l-4 border-blue-500 px-6 py-4 rounded shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
-        <div class="text-blue-500"><i data-lucide="check-circle" class="w-5 h-5"></i></div><div><?php echo $message; ?></div>
+    <div id="alertMessage" class="fixed bottom-4 right-4 z-[100] bg-white border-l-4 border-blue-500 px-6 py-4 rounded shadow-lg flex items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div class="flex items-center gap-3">
+            <div class="text-blue-500"><i data-lucide="check-circle" class="w-5 h-5"></i></div>
+            <div><?php echo $message; ?></div>
+        </div>
+        <button onclick="this.parentElement.remove()" class="p-1 text-slate-400 hover:text-slate-600 rounded-full -mr-2 -my-2"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
     <script>setTimeout(() => document.getElementById('alertMessage').remove(), 5000);</script>
 <?php endif; ?>
@@ -1130,7 +1134,7 @@ function getStatusColor($statusName) {
     </div>
     <?php endif; ?>
 
-    <div id="viewGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+    <div id="viewGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6 pb-24">
         <?php foreach($all_assets as $asset): $searchString = strtolower(implode(' ', [$asset['name'], $asset['code'], $asset['status'], $asset['company_name']??'', $asset['responsible_name']??'', $asset['category_name']??'', $asset['location_name']??'', $asset['brand']??'', $asset['model']??'', $asset['components_list']??'', $asset['accessories_list']??''])); ?>
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-blue-200 transition-all duration-300 overflow-hidden group asset-card relative flex flex-col" data-search="<?php echo htmlspecialchars($searchString); ?>" data-favorite="<?php echo $asset['is_favorite'] ? '1' : '0'; ?>" data-asset-id="<?php echo $asset['id']; ?>">
             <?php if(hasPermission('edit_asset') || hasPermission('delete_asset')): ?><div class="absolute top-3 left-3 z-10"><input type="checkbox" name="selected_assets[]" value="<?php echo $asset['id']; ?>" class="asset-checkbox w-5 h-5 rounded border-gray-300 text-blue-600 cursor-pointer" onchange="updateSelection()"></div><?php endif; ?>
@@ -1193,7 +1197,7 @@ function getStatusColor($statusName) {
         <button onclick="clearFilters()" class="mt-4 text-blue-600 font-bold text-sm hover:text-blue-700 hover:underline transition-colors">Limpar Filtros</button>
     </div>
 
-    <div id="viewList" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col mb-6">
+    <div id="viewList" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col mb-6 pb-24">
         <div class="overflow-x-auto">
             <table class="w-full text-sm text-left" id="assetsTable">
                 <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 sticky top-0 z-10 shadow-sm">
@@ -1257,7 +1261,9 @@ function getStatusColor($statusName) {
                 </tbody>
             </table>
         </div>
-    </div> <div id="paginationToolbar" class="flex flex-col md:flex-row justify-between items-center p-4 bg-white border border-slate-200 rounded-xl shadow-sm gap-4 mb-8">
+    </div> 
+    
+    <div id="paginationToolbar" class="sticky bottom-4 z-40 flex flex-col md:flex-row justify-between items-center p-4 bg-white/90 backdrop-blur border border-slate-200 rounded-xl shadow-2xl gap-4 transition-all duration-300">
         <div class="flex items-center gap-2 text-sm text-slate-600">
             <span>Mostrar</span>
             <select id="itemsPerPage" onchange="changeItemsPerPage()" class="border border-slate-300 rounded-lg p-1.5 bg-white outline-none focus:border-blue-500">

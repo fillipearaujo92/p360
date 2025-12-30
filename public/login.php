@@ -124,77 +124,145 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - AssetManager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Login - Patrimônio 360º</title>
+    <link rel="shortcut icon" href="src/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'); 
         body { font-family: 'Inter', sans-serif; }
+        
+        /* Animação suave para o fundo */
+        @keyframes blob {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob { animation: blob 7s infinite; }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
     </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 via-white to-slate-100 h-screen flex items-center justify-center p-4">
-    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200/80">
-        <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-600 mb-4">
-                <i data-lucide="codesandbox" class="w-6 h-6"></i>
-            </div>
-            <h1 class="text-2xl font-bold text-slate-800">AssetManager</h1>
-            <p class="text-slate-500 text-sm mt-1">Gestão Patrimonial Inteligente</p>
-        </div>
+<body class="bg-white h-screen w-full overflow-hidden flex">
 
-        <?php if($error): ?>
-            <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2">
-                <i data-lucide="alert-circle" class="h-5 w-5"></i>
-                <?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?>
-            </div>
-        <?php endif; ?>
-
-        <form method="POST" id="loginForm">
-            <div class="mb-4">
-                <label class="block text-slate-700 text-sm font-semibold mb-2">Email</label>
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <i data-lucide="mail" class="h-5 w-5 text-slate-400"></i>
-                    </div>
-                    <input type="email" name="email" required placeholder="ex: admin@empresa.com" class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                </div>
-            </div>
-            <div class="mb-4">
-                <label class="block text-slate-700 text-sm font-semibold mb-2">Senha</label>
-                <div class="relative">
-                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <i data-lucide="lock" class="h-5 w-5 text-slate-400"></i>
-                    </div>
-                    <input type="password" name="password" id="password" required placeholder="••••••••" class="w-full pl-10 pr-10 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                    <button type="button" id="togglePassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5">
-                        <i id="eye-open" data-lucide="eye" class="h-5 w-5 text-slate-500"></i>
-                        <i id="eye-closed" data-lucide="eye-off" class="h-5 w-5 text-slate-500 hidden"></i>
-                    </button>
-                </div>
-            </div>
-
-            <div class="flex items-center justify-between mb-6">
-                <div class="flex items-center">
-                    <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded">
-                    <label for="remember-me" class="ml-2 block text-sm text-slate-600">Lembrar-me</label>
-                </div>
-                <div class="text-sm">
-                    <a href="#" class="font-medium text-blue-600 hover:text-blue-500">
-                    </a>
-                </div>
-            </div>
-
-            <button type="submit" id="submitButton" class="w-full flex justify-center items-center gap-2 bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-lg shadow-blue-500/20">
-                <span id="buttonText">Entrar no Sistema</span>
-                <i id="buttonSpinner" data-lucide="loader-2" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden"></i>
-            </button>
-        </form>
+    <!-- Lado Esquerdo (Visual / Branding) - Apenas Desktop -->
+    <div class="hidden lg:flex lg:w-1/2 relative bg-slate-900 items-center justify-center overflow-hidden">
+        <!-- Background Image & Overlay -->
+        <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20 mix-blend-overlay"></div>
+        <div class="absolute inset-0 bg-gradient-to-br from-blue-600/90 to-slate-900/95"></div>
         
-        <div class="mt-8 pt-6 border-t border-slate-100 text-center">
-            <p class="text-xs text-slate-400">
-                Ainda não tem acesso? Contacte o administrador.
+        <!-- Elementos Decorativos Animados -->
+        <div class="absolute top-0 -left-4 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
+        <div class="absolute top-0 -right-4 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div class="absolute -bottom-8 left-20 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
+
+        <!-- Conteúdo -->
+        <div class="relative z-10 p-12 max-w-xl text-white">
+            <div class="w-24 h-24 mb-8">
+                <img src="src/Logo P360 Branco.png" alt="Patrimônio 360º Logo" class="w-24 h-24 object-contain">
+            </div>
+            <h2 class="text-5xl font-bold mb-6 leading-tight tracking-tight">Gestão Patrimonial <br><span class="text-blue-400">Inteligente.</span></h2>
+            <p class="text-lg text-blue-100/80 leading-relaxed mb-8">
+                Tenha controle total sobre o ciclo de vida dos seus ativos. 
+                Rastreamento, auditoria e manutenção em uma única plataforma integrada.
             </p>
+            
+            <div class="flex items-center gap-4 pt-8 border-t border-white/10">
+                <div class="flex -space-x-3">
+                    <div class="w-10 h-10 rounded-full border-2 border-slate-900 bg-slate-700 flex items-center justify-center text-xs font-bold">JD</div>
+                    <div class="w-10 h-10 rounded-full border-2 border-slate-900 bg-slate-600 flex items-center justify-center text-xs font-bold">AS</div>
+                    <div class="w-10 h-10 rounded-full border-2 border-slate-900 bg-slate-500 flex items-center justify-center text-xs font-bold">+5</div>
+                </div>
+                <div class="text-sm font-medium text-blue-200">
+                    <span class="text-white font-bold">Equipa Conectada</span><br>Acesso seguro e auditável.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lado Direito (Formulário) -->
+    <div class="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 lg:p-12 bg-white relative overflow-y-auto">
+        
+        <div class="w-full max-w-md space-y-8">
+            
+            <!-- Header Mobile -->
+            <div class="lg:hidden text-center mb-8">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white mb-4 shadow-lg shadow-blue-600/30">
+                    <i data-lucide="codesandbox" class="w-7 h-7"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-900">Patrimônio 360º</h1>
+            </div>
+
+            <!-- Header Desktop -->
+            <div class="text-center lg:text-left">
+                <h2 class="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo de volta</h2>
+                <p class="mt-2 text-slate-500">Insira as suas credenciais para aceder à sua conta.</p>
+            </div>
+
+            <?php if($error): ?>
+                <div class="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-sm flex items-start gap-3 animate-pulse" role="alert">
+                    <i data-lucide="alert-circle" class="h-5 w-5 shrink-0 mt-0.5"></i>
+                    <div>
+                        <span class="font-bold block mb-1">Falha na autenticação</span>
+                        <?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <form method="POST" id="loginForm" class="space-y-6">
+                
+                <div class="space-y-2">
+                    <label for="email" class="text-sm font-semibold text-slate-700">Email Corporativo</label>
+                    <div class="relative group">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="mail" class="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors"></i>
+                        </div>
+                        <input type="email" id="email" name="email" required 
+                            class="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all bg-slate-50 focus:bg-white" 
+                            placeholder="nome@empresa.com">
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label for="password" class="text-sm font-semibold text-slate-700">Senha</label>
+                        <a href="#" class="text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline">Esqueceu a senha?</a>
+                    </div>
+                    <div class="relative group">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="lock" class="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors"></i>
+                        </div>
+                        <input type="password" name="password" id="password" required 
+                            class="block w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all bg-slate-50 focus:bg-white" 
+                            placeholder="••••••••">
+                        <button type="button" id="togglePassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer">
+                            <i id="eye-open" data-lucide="eye" class="h-5 w-5"></i>
+                            <i id="eye-closed" data-lucide="eye-off" class="h-5 w-5 hidden"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center">
+                    <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded cursor-pointer">
+                    <label for="remember-me" class="ml-2 block text-sm text-slate-600 cursor-pointer select-none">Manter sessão iniciada</label>
+                </div>
+
+                <button type="submit" id="submitButton" class="w-full flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-lg shadow-blue-600/20 active:scale-[0.98]">
+                    <span id="buttonText">Entrar no Sistema</span>
+                    <i id="buttonSpinner" data-lucide="loader-2" class="animate-spin h-5 w-5 hidden"></i>
+                </button>
+            </form>
+
+            <div class="pt-6 text-center space-y-4">
+                <p class="text-sm text-slate-500">
+                    Não tem uma conta? <a href="#" class="font-medium text-blue-600 hover:text-blue-500 hover:underline">Contacte o suporte</a>
+                </p>
+                <p class="text-xs text-slate-400">
+                    &copy; <?php echo date('Y'); ?> Patrimônio 360º.
+                </p>
+            </div>
         </div>
     </div>
 
@@ -206,6 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         const eyeClosed = document.querySelector('#eye-closed');
 
         togglePassword.addEventListener('click', function (e) {
+            e.preventDefault(); // Prevent focus loss
             const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
             password.setAttribute('type', type);
             eyeOpen.classList.toggle('hidden');
@@ -219,8 +288,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         const buttonSpinner = document.querySelector('#buttonSpinner');
 
         loginForm.addEventListener('submit', function() {
+            // Prevent double submission
+            if (submitButton.disabled) return;
+            
             submitButton.disabled = true;
-            buttonText.textContent = 'A processar...';
+            submitButton.classList.add('opacity-75', 'cursor-not-allowed');
+            buttonText.textContent = 'Autenticando...';
             buttonSpinner.classList.remove('hidden');
         });
 

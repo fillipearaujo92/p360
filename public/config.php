@@ -1,4 +1,5 @@
 <?php
+// P360
 // config.php
 
 // Define o fuso horário padrão (Brasil)
@@ -63,8 +64,8 @@ function log_action($action, $description) {
         $user_id = $_SESSION['user_id'] ?? null;
         $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
         
-        $stmt = $pdo->prepare("INSERT INTO system_logs (user_id, action, description, ip_address) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$user_id, $action, $description, $ip_address]);
+        $stmt = $pdo->prepare("INSERT INTO system_logs (user_id, action, description, ip_address, created_at) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$user_id, $action, $description, $ip_address, date('Y-m-d H:i:s')]);
         
     } catch (Exception $e) {
         // Falha silenciosa no log

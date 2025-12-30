@@ -122,8 +122,12 @@ foreach($contracts as $c) {
 
 <!-- FEEDBACK -->
 <?php if($message): ?>
-    <div id="alertMessage" class="fixed top-4 right-4 z-[100] bg-white border-l-4 border-blue-500 px-6 py-4 rounded shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
-        <div class="text-blue-500"><i data-lucide="check-circle" class="w-5 h-5"></i></div><div><?php echo $message; ?></div>
+    <div id="alertMessage" class="fixed bottom-4 right-4 z-[100] bg-white border-l-4 border-blue-500 px-6 py-4 rounded shadow-lg flex items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div class="flex items-center gap-3">
+            <div class="text-blue-500"><i data-lucide="check-circle" class="w-5 h-5"></i></div>
+            <div><?php echo $message; ?></div>
+        </div>
+        <button onclick="this.parentElement.remove()" class="p-1 text-slate-400 hover:text-slate-600 rounded-full -mr-2 -my-2"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
     <script>setTimeout(() => document.getElementById('alertMessage').remove(), 4000);</script>
 <?php endif; ?>
