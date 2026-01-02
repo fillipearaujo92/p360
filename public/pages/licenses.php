@@ -345,12 +345,20 @@ endif;
 <div id="modalAssign" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
     <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeModal('modalAssign')"></div>
     <div class="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6 modal-panel">
-        <h3 class="text-lg font-bold mb-4">Atribuir Licença a um Ativo</h3>
+        <h3 class="text-lg font-bold text-slate-800 mb-4">Atribuir Licença a um Ativo</h3>
         <form method="POST">
             <input type="hidden" name="action" value="assign_license">
             <input type="hidden" name="license_id" value="<?php echo $license_detail['id']; ?>">
-            <div class="mb-4"><label class="block text-sm font-medium mb-1">Selecione o Ativo *</label><select name="asset_id" required class="w-full border p-2 rounded-lg bg-white"><?php foreach($available_assets as $a) echo "<option value='{$a['id']}'>[{$a['code']}] {$a['name']}</option>"; ?></select></div>
-            <div class="mt-6 flex justify-end gap-2"><button type="button" onclick="closeModal('modalAssign')" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button><button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">Atribuir</button></div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Selecione o Ativo *</label>
+                <input type="text" id="assetSearchAssign" onkeyup="filterAvailableAssets()" placeholder="Buscar por nome ou código..." class="w-full border border-slate-300 p-2 rounded-lg mb-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <select name="asset_id" id="assetSelectAssign" required class="w-full border border-slate-300 p-2 rounded-lg bg-white text-sm" size="5">
+                    <?php foreach($available_assets as $a): ?>
+                        <option value="<?php echo $a['id']; ?>" data-search="<?php echo htmlspecialchars(strtolower($a['name'].' '.$a['code'])); ?>"><?php echo htmlspecialchars("[{$a['code']}] {$a['name']}"); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="mt-6 flex justify-end gap-2"><button type="button" onclick="closeModal('modalAssign')" class="px-4 py-2 border rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button><button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Atribuir</button></div>
         </form>
     </div>
 </div>
@@ -414,6 +422,22 @@ endif;
     }
 
     function openAssignModal() { openModal('modalAssign'); }
+
+    function filterAvailableAssets() {
+        const input = document.getElementById('assetSearchAssign');
+        const filter = input.value.toLowerCase();
+        const select = document.getElementById('assetSelectAssign');
+        const options = select.options;
+
+        for (let i = 0; i < options.length; i++) {
+            const searchData = options[i].getAttribute('data-search');
+            if (searchData && searchData.includes(filter)) {
+                options[i].style.display = '';
+            } else {
+                options[i].style.display = 'none';
+            }
+        }
+    }
 
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();

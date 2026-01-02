@@ -4,6 +4,18 @@
 $page_title = "Periféricos e Consumíveis";
 $message = '';
 
+// Auto-setup: Garantir colunas de rastreamento em peripheral_movements
+try {
+    $pdo->query("SELECT to_asset_id FROM peripheral_movements LIMIT 1");
+} catch (Exception $e) {
+    try { $pdo->exec("ALTER TABLE peripheral_movements ADD COLUMN to_asset_id INT NULL"); } catch (Exception $e2) {}
+}
+try {
+    $pdo->query("SELECT from_asset_id FROM peripheral_movements LIMIT 1");
+} catch (Exception $e) {
+    try { $pdo->exec("ALTER TABLE peripheral_movements ADD COLUMN from_asset_id INT NULL"); } catch (Exception $e2) {}
+}
+
 // --- CARREGAR PERMISSÕES ---
 $user_role = $_SESSION['user_role'] ?? 'leitor';
 $stmt = $pdo->prepare("SELECT permissions FROM roles WHERE role_key = ?");
@@ -234,6 +246,15 @@ if ($view_mode === 'list') {
     $stmt->bindValue(':offset', (int) $offset, PDO::PARAM_INT);
     $stmt->execute();
     $peripherals = $stmt->fetchAll();
+
+    // Estatísticas Rápidas para o Topo da Lista
+    $stmtStats = $pdo->prepare("SELECT 
+        COUNT(*) as total_items, 
+        SUM(quantity) as total_quantity, 
+        SUM(CASE WHEN quantity <= min_stock AND min_stock > 0 THEN 1 ELSE 0 END) as low_stock_count 
+        FROM peripherals WHERE company_id = ?");
+    $stmtStats->execute([$company_id]);
+    $list_stats = $stmtStats->fetch();
 }
 
 // Busca as categorias da tabela 'categories' em vez de extrair da tabela de periféricos.
@@ -292,6 +313,31 @@ if ($message):
     <?php endif; ?>
 </div>
 
+<!-- CARDS DE RESUMO (KPIs) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="package" class="w-6 h-6"></i></div>
+        <div>
+            <p class="text-xs font-bold text-slate-400 uppercase">Itens Cadastrados</p>
+            <h3 class="text-xl font-bold text-slate-800"><?php echo $list_stats['total_items'] ?? 0; ?></h3>
+        </div>
+    </div>
+    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="layers" class="w-6 h-6"></i></div>
+        <div>
+            <p class="text-xs font-bold text-slate-400 uppercase">Estoque Total</p>
+            <h3 class="text-xl font-bold text-slate-800"><?php echo $list_stats['total_quantity'] ?? 0; ?></h3>
+        </div>
+    </div>
+    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+        <div class="p-3 <?php echo ($list_stats['low_stock_count'] > 0) ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-400'; ?> rounded-lg"><i data-lucide="alert-triangle" class="w-6 h-6"></i></div>
+        <div>
+            <p class="text-xs font-bold text-slate-400 uppercase">Estoque Baixo</p>
+            <h3 class="text-xl font-bold text-slate-800"><?php echo $list_stats['low_stock_count'] ?? 0; ?></h3>
+        </div>
+    </div>
+</div>
+
 <!-- FILTROS -->
 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4">
     <div class="relative flex-1">
@@ -333,21 +379,26 @@ if ($message):
                 </tr>
                 <?php else: ?>
                 <?php foreach($peripherals ?? [] as $p): ?>
-                <tr class="hover:bg-slate-50 transition-colors peripheral-row" data-search="<?php echo htmlspecialchars(strtolower($p['name'] . ' ' . $p['sku'] . ' ' . $p['category'] . ' ' . $p['location_name'])); ?>">
-                    <td class="p-4 font-medium text-slate-800"><?php echo htmlspecialchars($p['name']); ?></td>
-                    <td class="p-4 text-slate-600"><?php echo htmlspecialchars($p['category']); ?></td>
+                <?php $is_low_stock = ($p['quantity'] <= $p['min_stock'] && $p['min_stock'] > 0); ?>
+                <tr class="hover:bg-slate-50 transition-colors peripheral-row group <?php echo $is_low_stock ? 'bg-red-50/30' : ''; ?>" data-search="<?php echo htmlspecialchars(strtolower($p['name'] . ' ' . $p['sku'] . ' ' . $p['category'] . ' ' . $p['location_name'])); ?>">
+                    <td class="p-4 font-medium text-slate-800">
+                        <?php echo htmlspecialchars($p['name']); ?>
+                        <?php if($is_low_stock): ?>
+                            <span class="inline-flex items-center ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200" title="Estoque Baixo">Baixo</span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="p-4"><span class="px-2 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-medium border border-slate-200"><?php echo htmlspecialchars($p['category']); ?></span></td>
                     <td class="p-4 text-slate-500 font-mono text-xs"><?php echo htmlspecialchars($p['sku'] ?: '-'); ?></td>
                     <td class="p-4">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                            <i data-lucide="map-pin" class="w-3 h-3"></i> <?php echo htmlspecialchars($p['location_name'] ?: 'Geral'); ?>
-                        </span>
+                        <div class="flex items-center gap-1 text-slate-600 text-sm">
+                            <i data-lucide="map-pin" class="w-3 h-3 text-slate-400"></i> <?php echo htmlspecialchars($p['location_name'] ?: 'Geral'); ?>
+                        </div>
                     </td>
                     <td class="p-4 text-center">
                         <div class="flex flex-col items-center">
-                            <span class="font-bold text-sm <?php echo ($p['quantity'] <= $p['min_stock'] && $p['min_stock'] > 0) ? 'text-red-600' : 'text-slate-700'; ?>">
+                            <span class="font-bold text-sm <?php echo $is_low_stock ? 'text-red-600' : 'text-slate-700'; ?>">
                                 <?php echo $p['quantity']; ?> <span class="text-[10px] font-normal text-slate-400 ml-0.5">unid.</span>
                             </span>
-                            <?php if($p['min_stock'] > 0): ?><span class="text-[10px] text-slate-400 mt-0.5 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100" title="Estoque Mínimo">Min: <?php echo $p['min_stock']; ?></span><?php endif; ?>
                         </div>
                     </td>
                     <td class="p-4 text-right">
@@ -485,7 +536,7 @@ if ($message):
         <div class="flex items-start justify-between mb-4">
             <div>
                 <h3 class="text-lg font-bold text-slate-800" id="modalStockTitle">Ajustar Estoque</h3>
-                <p class="text-sm text-slate-500" id="modalStockItemName"></p>
+                <p class="text-sm text-slate-500 truncate max-w-xs" id="modalStockItemName"></p>
             </div>
             <button onclick="closeModal('modalStock')" class="p-1 text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
@@ -644,7 +695,7 @@ if ($message):
         <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
             <p class="text-xs font-bold text-slate-400 uppercase">Estoque Atual</p>
             <p class="text-2xl font-bold text-blue-600"><?php echo $peripheral_detail['quantity']; ?></p>
-        </div>
+    </div>
     <?php endif; ?>
 </div>
 
@@ -684,20 +735,20 @@ if ($message):
 
 <!-- RESUMO -->
 <?php if ($peripheral_detail): ?>
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-    <div class="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center justify-between">
+<div class="grid grid-cols-2 gap-4 mb-6">
+    <div class="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
         <div>
-            <p class="text-xs font-bold text-green-600 uppercase">Total Entradas</p>
-            <p class="text-2xl font-bold text-green-700">+<?php echo $total_entries; ?></p>
+            <p class="text-xs font-bold text-slate-400 uppercase">Total Entradas</p>
+            <p class="text-2xl font-bold text-emerald-600">+<?php echo $total_entries; ?></p>
         </div>
-        <div class="p-3 bg-green-100 rounded-lg text-green-600">
+        <div class="p-3 bg-emerald-50 rounded-lg text-emerald-600">
             <i data-lucide="arrow-down-left" class="w-6 h-6"></i>
         </div>
     </div>
-    <div class="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between">
+    <div class="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
         <div>
-            <p class="text-xs font-bold text-red-600 uppercase">Total Saídas</p>
-            <p class="text-2xl font-bold text-red-700">-<?php echo $total_exits; ?></p>
+            <p class="text-xs font-bold text-slate-400 uppercase">Total Saídas</p>
+            <p class="text-2xl font-bold text-rose-600">-<?php echo $total_exits; ?></p>
         </div>
         <div class="p-3 bg-red-100 rounded-lg text-red-600">
             <i data-lucide="arrow-up-right" class="w-6 h-6"></i>
@@ -719,26 +770,36 @@ if ($message):
             <p class="font-medium">Nenhum histórico de movimentação para este item.</p>
         </div>
     <?php else: ?>
-        <div class="space-y-8 border-l-2 border-slate-200 ml-4 pl-8">
+        <div class="relative space-y-8 before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent">
             <?php foreach ($movements as $mov): 
                 $is_entry = $mov['change_amount'] > 0;
-                $change_class = $is_entry ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50';
-                $icon = $is_entry ? 'plus' : 'minus';
+                $change_class = $is_entry ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100';
+                $icon = $is_entry ? 'arrow-down-left' : 'arrow-up-right';
+                $icon_bg = $is_entry ? 'bg-emerald-500' : 'bg-rose-500';
             ?>
-                <div class="relative">
-                    <div class="absolute -left-[41px] top-1 w-6 h-6 bg-white border-2 border-blue-500 rounded-full flex items-center justify-center">
-                        <i data-lucide="arrow-right-left" class="w-3 h-3 text-blue-500"></i>
+                <div class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                    <!-- Icone da Timeline -->
+                    <div class="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-200 group-[.is-active]:<?php echo $icon_bg; ?> text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2">
+                        <i data-lucide="<?php echo $icon; ?>" class="w-5 h-5"></i>
                     </div>
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <p class="text-sm font-medium text-slate-800"><?php echo htmlspecialchars($mov['reason']); ?></p>
-                        <span class="font-bold text-lg <?php echo $change_class; ?> px-2 py-1 rounded-md text-xs flex items-center gap-1 w-fit">
-                            <i data-lucide="<?php echo $icon; ?>" class="w-3 h-3"></i> <?php echo abs($mov['change_amount']); ?>
-                        </span>
-                    </div>
-                    <div class="text-xs text-slate-500 mt-1 flex items-center gap-x-3 gap-y-1 flex-wrap">
-                        <span><i data-lucide="calendar" class="w-3 h-3 inline mr-1"></i><?php echo date('d/m/Y H:i', strtotime($mov['created_at'])); ?></span>
-                        <span><i data-lucide="user" class="w-3 h-3 inline mr-1"></i><?php echo htmlspecialchars($mov['user_name'] ?? 'Sistema'); ?></span>
-                        <span class="font-medium">Estoque Final: <span class="font-bold text-slate-700"><?php echo $mov['new_quantity']; ?></span></span>
+                    
+                    <!-- Card de Conteúdo -->
+                    <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="font-bold text-sm px-2 py-1 rounded-md border <?php echo $change_class; ?>">
+                                <?php echo $is_entry ? '+' : ''; ?><?php echo $mov['change_amount']; ?>
+                            </span>
+                            <span class="text-xs text-slate-400"><?php echo date('d/m/Y H:i', strtotime($mov['created_at'])); ?></span>
+                        </div>
+                        <p class="text-sm font-medium text-slate-800 mb-2"><?php echo htmlspecialchars($mov['reason']); ?></p>
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100 mt-2">
+                            <div class="flex items-center gap-1.5 text-xs text-slate-500">
+                                <i data-lucide="user" class="w-3 h-3"></i> <?php echo htmlspecialchars($mov['user_name'] ?? 'Sistema'); ?>
+                            </div>
+                            <div class="text-xs font-medium text-slate-600">
+                                Saldo: <span class="font-bold text-slate-800"><?php echo $mov['new_quantity']; ?></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             <?php endforeach; ?>

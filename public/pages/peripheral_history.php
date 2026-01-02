@@ -5,6 +5,18 @@ $page_title = "Histórico de Movimentações";
 $peripheral = null;
 $movements = [];
 
+// Auto-setup: Garantir colunas de rastreamento em peripheral_movements
+try {
+    $pdo->query("SELECT to_asset_id FROM peripheral_movements LIMIT 1");
+} catch (Exception $e) {
+    try { $pdo->exec("ALTER TABLE peripheral_movements ADD COLUMN to_asset_id INT NULL"); } catch (Exception $e2) {}
+}
+try {
+    $pdo->query("SELECT from_asset_id FROM peripheral_movements LIMIT 1");
+} catch (Exception $e) {
+    try { $pdo->exec("ALTER TABLE peripheral_movements ADD COLUMN from_asset_id INT NULL"); } catch (Exception $e2) {}
+}
+
 // =================================================================================
 // 1. VALIDAÇÃO E BUSCA DE DADOS
 // =================================================================================

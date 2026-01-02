@@ -9,6 +9,20 @@ foreach($dirs as $d) {
     if (!is_dir($path)) @mkdir($path, 0777, true);
 }
 
+// Auto-setup: Garantir colunas de rastreamento em peripheral_movements
+$cols_ok = false;
+try {
+    $res = $pdo->query("SELECT to_asset_id FROM peripheral_movements LIMIT 1");
+    if ($res !== false) $cols_ok = true;
+} catch (Exception $e) { }
+
+if (!$cols_ok) {
+    try {
+        $pdo->exec("ALTER TABLE peripheral_movements ADD COLUMN to_asset_id INT NULL");
+        $pdo->exec("ALTER TABLE peripheral_movements ADD COLUMN from_asset_id INT NULL");
+    } catch (Exception $e2) {}
+}
+
 // --- CARREGAR PERMISSÕES ---
 $stmt = $pdo->prepare("SELECT permissions FROM roles WHERE role_key = ?");
 $stmt->execute([$user_role]);
@@ -243,12 +257,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // --- TRANSFERÊNCIA DE EMPRESA EM MASSA ---
         if ($action == 'bulk_transfer_assets' && hasPermission('edit_asset')) {
             $ids = explode(',', $_POST['ids']);
-            $ids = array_filter($ids, 'is_numeric');
+            $initial_ids = array_filter($ids, 'is_numeric');
             $target_company_id = $_POST['target_company_id'];
             $target_location_id = !empty($_POST['target_location_id']) ? $_POST['target_location_id'] : null;
             $target_status = !empty($_POST['target_status']) ? $_POST['target_status'] : null;
 
-            if (!empty($ids) && !empty($target_company_id)) {
+            if (!empty($initial_ids) && !empty($target_company_id)) {
+                // --- EXPANDIR SELEÇÃO PARA INCLUIR ATIVOS RELACIONADOS ---
+                $all_ids_to_transfer = $initial_ids;
+                $processed_for_links = [];
+                $i = 0;
+                while ($i < count($all_ids_to_transfer)) {
+                    $current_id_for_link_check = $all_ids_to_transfer[$i];
+                    if (!in_array($current_id_for_link_check, $processed_for_links)) {
+                        $stmtLinks = $pdo->prepare("SELECT asset_id_1, asset_id_2 FROM asset_links WHERE asset_id_1 = ? OR asset_id_2 = ?");
+                        $stmtLinks->execute([$current_id_for_link_check, $current_id_for_link_check]);
+                        $links = $stmtLinks->fetchAll();
+                        foreach ($links as $link) {
+                            $linked_id = ($link['asset_id_1'] == $current_id_for_link_check) ? $link['asset_id_2'] : $link['asset_id_1'];
+                            if (!in_array($linked_id, $all_ids_to_transfer)) {
+                                $all_ids_to_transfer[] = $linked_id;
+                            }
+                        }
+                        $processed_for_links[] = $current_id_for_link_check;
+                    }
+                    $i++;
+                }
+                $final_ids_to_transfer = array_unique($all_ids_to_transfer);
+
                 // Busca nome da empresa destino para o log
                 $stmtTgt = $pdo->prepare("SELECT name, email FROM companies WHERE id = ?");
                 $stmtTgt->execute([$target_company_id]);
@@ -258,7 +294,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                 $count = 0;
                 $transferred_assets_list = [];
-                foreach ($ids as $id) {
+                foreach ($final_ids_to_transfer as $id) {
                     // Busca dados atuais do ativo e nome da empresa de origem
                     $stmt = $pdo->prepare("SELECT a.company_id, a.category_id, a.status, a.name, a.code, c.name as company_name FROM assets a LEFT JOIN companies c ON a.company_id = c.id WHERE a.id = ?");
                     $stmt->execute([$id]);
@@ -355,7 +391,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     @mail($target_company_email, $subject, $body, $headers);
                 }
 
-                $message = "$count ativos foram transferidos para a nova empresa.";
+                $message = "$count ativos (incluindo relacionados) foram transferidos para a nova empresa.";
             }
         }
 
@@ -427,6 +463,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $sql = "INSERT INTO movements (company_id, asset_id, user_id, type, from_value, to_value, description, signature_url, responsible_name, giver_name, location_manager_name, manager_confirmed, manager_confirmed_at, created_at) VALUES (?, ?, ?, 'local', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$company_id, $id, $user_id, $old['location_id'] ?? 0, $new_location, $log_desc, $signature_url, $receiver, $giver, $loc_manager, $manager_confirmed, $confirmed_at]);
+
+            // --- MOVIMENTAÇÃO EM CASCATA (ATIVOS RELACIONADOS) ---
+            $stmtLinks = $pdo->prepare("SELECT asset_id_1, asset_id_2 FROM asset_links WHERE asset_id_1 = ? OR asset_id_2 = ?");
+            $stmtLinks->execute([$id, $id]);
+            $linked_assets = $stmtLinks->fetchAll();
+
+            foreach ($linked_assets as $link) {
+                $linked_id = ($link['asset_id_1'] == $id) ? $link['asset_id_2'] : $link['asset_id_1'];
+                
+                // Busca dados atuais do ativo vinculado
+                $stmtLinked = $pdo->prepare("SELECT name, code, location_id, status FROM assets WHERE id = ?");
+                $stmtLinked->execute([$linked_id]);
+                $lAsset = $stmtLinked->fetch();
+
+                if ($lAsset) {
+                    // Atualiza o ativo vinculado com os mesmos dados de destino
+                    $stmtUpd = $pdo->prepare("UPDATE assets SET location_id = ?, status = ?, responsible_name = ? WHERE id = ?");
+                    $stmtUpd->execute([$new_location, $new_status, $receiver, $linked_id]);
+
+                    // Log de movimentação para o ativo vinculado
+                    $l_log_desc = "Movimentação automática (Vinculado a {$old['name']}). Para '{$new_loc_name}'. Motivo: $reason";
+                    $stmtLog = $pdo->prepare("INSERT INTO movements (company_id, asset_id, user_id, type, from_value, to_value, description, signature_url, responsible_name, giver_name, location_manager_name, manager_confirmed, manager_confirmed_at, created_at) VALUES (?, ?, ?, 'local', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+                    $stmtLog->execute([$company_id, $linked_id, $user_id, $lAsset['location_id'] ?? 0, $new_location, $l_log_desc, $signature_url, $receiver, $giver, $loc_manager, $manager_confirmed, $confirmed_at]);
+                }
+            }
 
             $pdo->commit();
             log_action('asset_move', "Ativo '{$old['name']}' ({$old['code']}) movido para '{$new_loc_name}' por '{$receiver}'. Motivo: {$reason}.");
