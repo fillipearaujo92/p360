@@ -1,49 +1,6 @@
 <?php
 // pages/settings.php
 
-// --- API EXPORT LOGIC ---
-if (isset($_GET['api_export'])) {
-    header('Content-Type: application/json; charset=utf-8');
-    
-    // Auth check (using the key from config.php)
-    $request_key = $_SERVER['HTTP_X_API_KEY'] ?? $_GET['api_key'] ?? '';
-    if (empty($api_key) || $request_key !== $api_key) {
-        http_response_code(401);
-        echo json_encode(['error' => 'Acesso não autorizado. Chave de API inválida ou não configurada.']);
-        exit;
-    }
-
-    $resource = $_GET['resource'] ?? '';
-    $data = [];
-    $allowed_resources = ['assets', 'movements', 'system_logs', 'tickets', 'users', 'companies', 'locations', 'categories', 'peripherals', 'licenses', 'contracts'];
-
-    if (in_array($resource, $allowed_resources)) {
-        try {
-            $query = "SELECT * FROM {$resource}";
-            if ($resource === 'assets') {
-                 $query = "
-                    SELECT a.*, c.name as company_name, l.name as location_name, cat.name as category_name 
-                    FROM assets a 
-                    LEFT JOIN companies c ON a.company_id = c.id 
-                    LEFT JOIN locations l ON a.location_id = l.id 
-                    LEFT JOIN categories cat ON a.category_id = cat.id
-                ";
-            }
-            $stmt = $pdo->query($query);
-            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Exception $e) {
-            http_response_code(500);
-            $data = ['error' => 'Erro ao consultar o recurso.', 'details' => $e->getMessage()];
-        }
-    } else {
-        http_response_code(400);
-        $data = ['error' => 'Recurso inválido. Disponíveis: ' . implode(', ', $allowed_resources)];
-    }
-
-    echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
 $message = '';
 
 // =================================================================================
@@ -455,66 +412,6 @@ try {
         </div>
     </div>
 
-    <!-- 3. API e Integrações -->
-    <div>
-        <h2 class="text-lg font-semibold text-slate-700 mb-4 flex items-center gap-2">
-            <i data-lucide="share-2" class="w-5 h-5"></i> API e Integrações
-        </h2>
-        
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <h3 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
-                <i data-lucide="key-round" class="w-5 h-5 text-amber-500"></i> 
-                Sua Chave de API
-            </h3>
-            <p class="text-slate-600 mb-4 text-sm">
-                Use esta chave para autenticar suas requisições aos endpoints de dados. Mantenha-a em segurança.
-            </p>
-            
-            <div class="flex items-center gap-2 bg-slate-100 p-3 rounded-lg border border-slate-200">
-                <input type="text" id="apiKeyInput" readonly value="<?php echo htmlspecialchars($api_key ?? 'NÃO CONFIGURADA'); ?>" class="flex-1 bg-transparent font-mono text-sm text-slate-700 outline-none">
-                <button onclick="copyApiKey()" class="p-2 text-slate-500 hover:bg-slate-200 rounded-md transition-colors" title="Copiar Chave">
-                    <i data-lucide="copy" class="w-4 h-4"></i>
-                </button>
-            </div>
-            <?php if (empty($api_key)): ?>
-                <p class="text-xs text-red-500 mt-2">A chave de API não está definida no seu arquivo <code>config.php</code>.</p>
-            <?php endif; ?>
-
-            <div class="mt-8 pt-6 border-t border-slate-100">
-                <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <i data-lucide="database" class="w-5 h-5 text-green-500"></i> 
-                    Endpoints de Dados (JSON)
-                </h3>
-                <p class="text-slate-600 mb-4 text-sm">
-                    Acesse os dados brutos do sistema para integração com ferramentas de BI (Business Intelligence) como Power BI, Looker Studio, ou para automações.
-                </p>
-                
-                <div class="space-y-2">
-                    <?php
-                    $base_url = "index.php";
-                    $endpoints = ['assets', 'movements', 'system_logs', 'tickets', 'users', 'companies', 'locations', 'categories', 'peripherals', 'licenses', 'contracts'];
-                    foreach ($endpoints as $ep) {
-                        $url = $base_url . "?page=settings&api_export=true&resource={$ep}&api_key=" . urlencode($api_key);
-                        echo "<div class='flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 text-sm'>
-                                <span class='font-mono bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-xs font-bold'>GET</span>
-                                <input type='text' readonly value='.../index.php?page=settings&api_export=true&resource={$ep}' class='flex-1 bg-transparent outline-none text-slate-700'>
-                                <a href='{$url}' target='_blank' class='p-2 text-slate-500 hover:bg-slate-200 rounded-md transition-colors' title='Abrir em nova aba'>
-                                    <i data-lucide='external-link' class='w-4 h-4'></i>
-                                </a>
-                              </div>";
-                    }
-                    ?>
-                </div>
-
-                <div class="mt-6 bg-slate-800 text-white p-4 rounded-lg">
-                    <p class="text-sm font-semibold mb-2">Exemplo de uso com cURL:</p>
-                    <code class="text-xs text-slate-300 block bg-black/20 p-3 rounded font-mono overflow-x-auto">
-                        curl -X GET -H "X-API-KEY: <?php echo htmlspecialchars($api_key ?? 'SUA_CHAVE'); ?>" "<?php echo (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]" . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\'); ?>/index.php?page=settings&api_export=true&resource=assets"
-                    </code>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <!-- Modal de Confirmação -->
@@ -598,22 +495,6 @@ try {
         setTimeout(() => {
             modal.classList.add('hidden');
         }, 300);
-    }
-
-    function copyApiKey() {
-        const input = document.getElementById('apiKeyInput');
-        input.select();
-        input.setSelectionRange(0, 99999); // For mobile devices
-        document.execCommand('copy');
-        
-        Toastify({
-            text: "Chave de API copiada!",
-            duration: 3000,
-            close: true,
-            gravity: 'bottom',
-            position: 'right',
-            style: { background: 'linear-gradient(to right, #10b981, #059669)' }
-        }).showToast();
     }
 
     // Chart.js Initialization
